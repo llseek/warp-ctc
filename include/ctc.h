@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 //forward declare of CUDA typedef to avoid needing to pull in CUDA headers
-typedef struct CUstream_st* CUstream;
+typedef struct ihipStream_t* hipStream_t;
 
 typedef enum {
     CTC_STATUS_SUCCESS = 0,
@@ -48,7 +48,7 @@ struct ctcOptions {
         unsigned int num_threads;
 
         /// used when loc == CTC_GPU, which stream the kernels should be launched in
-        CUstream stream;
+        hipStream_t stream;
     };
 
     /// the label value/index that the CTC calculation should use as the blank label

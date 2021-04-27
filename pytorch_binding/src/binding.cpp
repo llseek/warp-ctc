@@ -6,11 +6,11 @@
 #include <torch/extension.h>
 
 #ifdef WARPCTC_ENABLE_GPU
-	#include "ATen/cuda/CUDAContext.h"
-	#include <c10/cuda/CUDAGuard.h>
-	#include "ATen/cuda/CUDAEvent.h"
+	#include "ATen/hip/HIPContext.h"
+	#include <c10/hip/HIPGuard.h>
+	#include "ATen/hip/HIPEvent.h"
 
-    #include "THC.h"
+    #include "THH.h"
     extern THCState* state;
 #endif
 
@@ -85,7 +85,7 @@ int gpu_ctc(torch::Tensor probs,
     memset(&options, 0, sizeof(options));
     options.loc = CTC_GPU;
     options.blank_label = blank_label;
-    options.stream = at::cuda::getCurrentCUDAStream();
+    options.stream = at::cuda::getCurrentHIPStream();
 
     size_t gpu_size_bytes;
     get_workspace_size(label_sizes_ptr, sizes_ptr,

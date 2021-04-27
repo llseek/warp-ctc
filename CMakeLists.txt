@@ -16,11 +16,14 @@ IF (APPLE)
 ENDIF()
 
 include_directories(include)
+include_directories(/opt/rocm/include)
 
-FIND_PACKAGE(CUDA 6.5)
-MESSAGE(STATUS "cuda found ${CUDA_FOUND}")
+set(CMAKE_MODULE_PATH "/opt/rocm/hip/cmake" ${CMAKE_MODULE_PATH})
+find_package(HIP)
+MESSAGE(STATUS "hip found ${HIP_FOUND}")
+find_package(hiprand)
 
-option(WITH_GPU "compile warp-ctc with cuda." ${CUDA_FOUND})
+option(WITH_GPU "compile warp-ctc with hip." ${HIP_FOUND})
 option(WITH_OMP "compile warp-ctc with openmp." ON)
 
 if(NOT WITH_OMP)
@@ -77,17 +80,19 @@ IF (WITH_GPU)
 
     MESSAGE(STATUS "Building shared library with GPU support")
 
-    CUDA_ADD_LIBRARY(warpctc SHARED src/ctc_entrypoint.cu src/reduce.cu)
+    HIP_ADD_LIBRARY(warpctc SHARED src/ctc_entrypoint.cu src/reduce.cu HIPCC_OPTIONS "-fno-gpu-rdc")
+    FIND_LIBRARY(HIP_LIB hip_hcc /opt/rocm/lib)
+    TARGET_LINK_LIBRARIES(warpctc PUBLIC ${HIP_LIB})
     IF (!Torch_FOUND)
-        TARGET_LINK_LIBRARIES(warpctc ${CUDA_curand_LIBRARY})
+        TARGET_LINK_LIBRARIES(warpctc ${hiprand_LIBRARY_DIRS}/libhiprand.so)
     ENDIF()
 
     add_executable(test_cpu tests/test_cpu.cpp tests/random.cpp )
     TARGET_LINK_LIBRARIES(test_cpu warpctc)
     SET_TARGET_PROPERTIES(test_cpu PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} --std=c++14")
 
-    cuda_add_executable(test_gpu tests/test_gpu.cu tests/random.cpp )
-    TARGET_LINK_LIBRARIES(test_gpu warpctc ${CUDA_curand_LIBRARY})
+    HIP_ADD_EXECUTABLE(test_gpu tests/test_gpu.cu tests/random.cpp )
+    TARGET_LINK_LIBRARIES(test_gpu warpctc ${hiprand_LIBRARY_DIRS}/libhiprand.so)
     SET_TARGET_PROPERTIES(test_gpu PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} --std=c++14")
 
     INSTALL(TARGETS warpctc

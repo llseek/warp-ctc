@@ -1,3 +1,4 @@
+#include <hip/hip_runtime.h>
 #include <cmath>
 #include <tuple>
 #include <vector>
@@ -24,18 +25,18 @@ bool small_test() {
         expected_score = probs[1] * probs[7];
     }
 
-    cudaStream_t stream;
-    throw_on_error(cudaStreamCreate(&stream),
-                   "cudaStreamCreate");
+    hipStream_t stream;
+    throw_on_error(hipStreamCreate(&stream),
+                   "hipStreamCreate");
 
     float *activations_gpu;
-    throw_on_error(cudaMalloc(&activations_gpu,
+    throw_on_error(hipMalloc(&activations_gpu,
                    activations.size() * sizeof(float)),
-                   "cudaMalloc");
-    throw_on_error(cudaMemcpyAsync(activations_gpu, activations.data(),
+                   "hipMalloc");
+    throw_on_error(hipMemcpyAsync(activations_gpu, activations.data(),
                                    activations.size() * sizeof(float),
-                                   cudaMemcpyHostToDevice, stream),
-                   "cudaMemcpyAsync");
+                                   hipMemcpyHostToDevice, stream),
+                   "hipMemcpyAsync");
 
     std::vector<int> labels = {1, 2};
     std::vector<int> label_lengths = {2};
@@ -56,8 +57,8 @@ bool small_test() {
                    "Error: get_workspace_size in small_test");
 
     char *ctc_gpu_workspace;
-    throw_on_error(cudaMalloc(&ctc_gpu_workspace, gpu_alloc_bytes),
-                   "cudaMalloc");
+    throw_on_error(hipMalloc(&ctc_gpu_workspace, gpu_alloc_bytes),
+                   "hipMalloc");
 
     throw_on_error(compute_ctc_loss(activations_gpu, nullptr,
                                     labels.data(), label_lengths.data(),
@@ -75,12 +76,12 @@ bool small_test() {
     const float lb = expected_score - eps;
     const float ub = expected_score + eps;
 
-    throw_on_error(cudaFree(activations_gpu),
-                   "cudaFree");
-    throw_on_error(cudaFree(ctc_gpu_workspace),
-                   "cudaFree");
-    throw_on_error(cudaStreamDestroy(stream),
-                   "cudaStreamDestroy");
+    throw_on_error(hipFree(activations_gpu),
+                   "hipFree");
+    throw_on_error(hipFree(ctc_gpu_workspace),
+                   "hipFree");
+    throw_on_error(hipStreamDestroy(stream),
+                   "hipStreamDestroy");
 
     return (score > lb && score < ub);
 }
@@ -141,18 +142,18 @@ bool options_test() {
         a = std::log(a);
     }
 
-    cudaStream_t stream;
-    throw_on_error(cudaStreamCreate(&stream),
-                   "cudaStreamCreate");
+    hipStream_t stream;
+    throw_on_error(hipStreamCreate(&stream),
+                   "hipStreamCreate");
 
     float *activations_gpu;
-    throw_on_error(cudaMalloc(&activations_gpu,
+    throw_on_error(hipMalloc(&activations_gpu,
                    activations.size() * sizeof(float)),
-                   "cudaMalloc");
-    throw_on_error(cudaMemcpyAsync(activations_gpu, activations.data(),
+                   "hipMalloc");
+    throw_on_error(hipMemcpyAsync(activations_gpu, activations.data(),
                                    activations.size() * sizeof(float),
-                                   cudaMemcpyHostToDevice, stream),
-                   "cudaMemcpyAsync");
+                                   hipMemcpyHostToDevice, stream),
+                   "hipMemcpyAsync");
 
     std::vector<int> labels = {0, 1, 2, 1, 0,
                                0, 1, 1, 0};
@@ -164,8 +165,8 @@ bool options_test() {
     float score[2];
 
     float *grads_gpu;
-    throw_on_error(cudaMalloc(&grads_gpu, (alphabet_size * T * minibatch) * sizeof(float)),
-                   "cudaMalloc");
+    throw_on_error(hipMalloc(&grads_gpu, (alphabet_size * T * minibatch) * sizeof(float)),
+                   "hipMalloc");
 
     ctcOptions options{};
     options.loc = CTC_GPU;
@@ -179,8 +180,8 @@ bool options_test() {
                    "Error: get_workspace_size in options_test");
 
     char *ctc_gpu_workspace;
-    throw_on_error(cudaMalloc(&ctc_gpu_workspace, gpu_alloc_bytes),
-                   "cudaMalloc");
+    throw_on_error(hipMalloc(&ctc_gpu_workspace, gpu_alloc_bytes),
+                   "hipMalloc");
 
     throw_on_error(compute_ctc_loss(activations_gpu, grads_gpu,
                                     labels.data(), label_lengths.data(),
@@ -193,18 +194,18 @@ bool options_test() {
                    "Error: compute_ctc_loss in options_test");
 
     std::vector<float> grads(alphabet_size * T * minibatch);
-    throw_on_error(cudaMemcpyAsync(grads.data(), grads_gpu,
+    throw_on_error(hipMemcpyAsync(grads.data(), grads_gpu,
                                    grads.size() * sizeof(float),
-                                   cudaMemcpyDeviceToHost, stream),
-                   "cudaMemcpyAsync");
-    throw_on_error(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
+                                   hipMemcpyDeviceToHost, stream),
+                   "hipMemcpyAsync");
+    throw_on_error(hipStreamSynchronize(stream), "hipStreamSynchronize");
 
-    throw_on_error(cudaFree(activations_gpu),
-                   "cudaFree");
-    throw_on_error(cudaFree(ctc_gpu_workspace),
-                   "cudaFree");
-    throw_on_error(cudaStreamDestroy(stream),
-                   "cudaStreamDestroy");
+    throw_on_error(hipFree(activations_gpu),
+                   "hipFree");
+    throw_on_error(hipFree(ctc_gpu_workspace),
+                   "hipFree");
+    throw_on_error(hipStreamDestroy(stream),
+                   "hipStreamDestroy");
 
     const double eps = 1e-4;
 
@@ -252,24 +253,24 @@ bool inf_test() {
     for (int i = 0; i < T; ++i)
         acts[alphabet_size * i + 2] = -1e30;
 
-    cudaStream_t stream;
-    throw_on_error(cudaStreamCreate(&stream),
-                   "cudaStreamCreate");
+    hipStream_t stream;
+    throw_on_error(hipStreamCreate(&stream),
+                   "hipStreamCreate");
 
     float *acts_gpu;
-    throw_on_error(cudaMalloc(&acts_gpu, acts.size() * sizeof(float)),
-                   "cudaMalloc");
-    throw_on_error(cudaMemcpyAsync(acts_gpu, acts.data(),
+    throw_on_error(hipMalloc(&acts_gpu, acts.size() * sizeof(float)),
+                   "hipMalloc");
+    throw_on_error(hipMemcpyAsync(acts_gpu, acts.data(),
                                    acts.size() * sizeof(float),
-                                   cudaMemcpyHostToDevice, stream),
-                   "cudaMemcpyAsync");
+                                   hipMemcpyHostToDevice, stream),
+                   "hipMemcpyAsync");
 
     std::vector<int> lengths;
     lengths.push_back(T);
 
     float *grads_gpu;
-    throw_on_error(cudaMalloc(&grads_gpu, (alphabet_size * T) * sizeof(float)),
-                   "cudaMalloc");
+    throw_on_error(hipMalloc(&grads_gpu, (alphabet_size * T) * sizeof(float)),
+                   "hipMalloc");
 
     float cost;
 
@@ -284,8 +285,8 @@ bool inf_test() {
                    "Error: get_workspace_size in inf_test");
 
     char *ctc_gpu_workspace;
-    throw_on_error(cudaMalloc(&ctc_gpu_workspace, gpu_alloc_bytes),
-                   "cudaMalloc");
+    throw_on_error(hipMalloc(&ctc_gpu_workspace, gpu_alloc_bytes),
+                   "hipMalloc");
 
     throw_on_error(compute_ctc_loss(acts_gpu, grads_gpu,
                                     labels.data(), label_lengths.data(),
@@ -300,19 +301,19 @@ bool inf_test() {
     bool status = std::isinf(cost);
 
     std::vector<float> grads(alphabet_size * T);
-    throw_on_error(cudaMemcpyAsync(grads.data(), grads_gpu,
+    throw_on_error(hipMemcpyAsync(grads.data(), grads_gpu,
                                    grads.size() * sizeof(float),
-                                   cudaMemcpyDeviceToHost, stream),
-                   "cudaMemcpyAsync");
-    throw_on_error(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
+                                   hipMemcpyDeviceToHost, stream),
+                   "hipMemcpyAsync");
+    throw_on_error(hipStreamSynchronize(stream), "hipStreamSynchronize");
 
     for (int i = 0; i < alphabet_size * T; ++i)
         status &= !std::isnan(grads[i]);
 
-    throw_on_error(cudaFree(acts_gpu), "cudaFree");
-    throw_on_error(cudaFree(grads_gpu), "cudaFree");
-    throw_on_error(cudaFree(ctc_gpu_workspace), "cudaFree");
-    throw_on_error(cudaStreamDestroy(stream), "cudaStreamDestroy");
+    throw_on_error(hipFree(acts_gpu), "hipFree");
+    throw_on_error(hipFree(grads_gpu), "hipFree");
+    throw_on_error(hipFree(ctc_gpu_workspace), "hipFree");
+    throw_on_error(hipStreamDestroy(stream), "hipStreamDestroy");
 
     return status;
 }
@@ -326,17 +327,17 @@ float grad_check(int T, int alphabet_size,
 
     const int minibatch = labels.size();
 
-    cudaStream_t stream;
-    throw_on_error(cudaStreamCreate(&stream),
-                   "cudaStreamCreate");
+    hipStream_t stream;
+    throw_on_error(hipStreamCreate(&stream),
+                   "hipStreamCreate");
 
     float *acts_gpu;
-    throw_on_error(cudaMalloc(&acts_gpu, acts.size() * sizeof(float)),
-                   "cudaMalloc");
-    throw_on_error(cudaMemcpyAsync(acts_gpu, acts.data(),
+    throw_on_error(hipMalloc(&acts_gpu, acts.size() * sizeof(float)),
+                   "hipMalloc");
+    throw_on_error(hipMemcpyAsync(acts_gpu, acts.data(),
                                    acts.size() * sizeof(float),
-                                   cudaMemcpyHostToDevice, stream),
-                   "cudaMemcpyAsync");
+                                   hipMemcpyHostToDevice, stream),
+                   "hipMemcpyAsync");
 
     std::vector<int> flat_labels;
     std::vector<int> label_lengths;
@@ -348,8 +349,8 @@ float grad_check(int T, int alphabet_size,
     std::vector<float> costs(minibatch);
 
     float *grads_gpu;
-    throw_on_error(cudaMalloc(&grads_gpu, acts.size() * sizeof(float)),
-                   "cudaMalloc");
+    throw_on_error(hipMalloc(&grads_gpu, acts.size() * sizeof(float)),
+                   "hipMalloc");
 
     ctcOptions options{};
     options.loc = CTC_GPU;
@@ -365,8 +366,8 @@ float grad_check(int T, int alphabet_size,
                    "Error: get_workspace_size in grad_check");
 
     char *ctc_gpu_workspace;
-    throw_on_error(cudaMalloc(&ctc_gpu_workspace, gpu_alloc_bytes),
-                   "cudaMalloc");
+    throw_on_error(hipMalloc(&ctc_gpu_workspace, gpu_alloc_bytes),
+                   "hipMalloc");
 
     throw_on_error(compute_ctc_loss(acts_gpu, grads_gpu,
                                     flat_labels.data(),
@@ -380,21 +381,21 @@ float grad_check(int T, int alphabet_size,
                    "Error: compute_ctc_loss (0) in grad_check");
 
     std::vector<float> grads(acts.size());
-    throw_on_error(cudaMemcpyAsync(grads.data(),
+    throw_on_error(hipMemcpyAsync(grads.data(),
                                    grads_gpu, grads.size() * sizeof(float),
-                                   cudaMemcpyDeviceToHost, stream),
-                   "cudaMemcpyAsync");
-    throw_on_error(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
+                                   hipMemcpyDeviceToHost, stream),
+                   "hipMemcpyAsync");
+    throw_on_error(hipStreamSynchronize(stream), "hipStreamSynchronize");
     std::vector<float> num_grad(grads.size());
 
     //perform 2nd order central differencing
     for (int i = 0; i < T * alphabet_size * minibatch; ++i) {
         acts[i] += epsilon;
 
-        throw_on_error(cudaMemcpyAsync(acts_gpu, acts.data(),
+        throw_on_error(hipMemcpyAsync(acts_gpu, acts.data(),
                                        acts.size() * sizeof(float),
-                                       cudaMemcpyHostToDevice, stream),
-                       "cudaMemcpyAsync");
+                                       hipMemcpyHostToDevice, stream),
+                       "hipMemcpyAsync");
 
         std::vector<float> costsP1(minibatch);
         std::vector<float> costsP2(minibatch);
@@ -411,10 +412,10 @@ float grad_check(int T, int alphabet_size,
                        "Error: compute_ctc_loss (1) in grad_check");
 
         acts[i] -= 2 * epsilon;
-        throw_on_error(cudaMemcpyAsync(acts_gpu, acts.data(),
+        throw_on_error(hipMemcpyAsync(acts_gpu, acts.data(),
                                        acts.size() * sizeof(float),
-                                       cudaMemcpyHostToDevice, stream),
-                       "cudaMemcpyAsync");
+                                       hipMemcpyHostToDevice, stream),
+                       "hipMemcpyAsync");
 
         throw_on_error(compute_ctc_loss(acts_gpu, NULL,
                                         flat_labels.data(),
@@ -437,14 +438,14 @@ float grad_check(int T, int alphabet_size,
 
     float diff = rel_diff(grads, num_grad);
 
-    throw_on_error(cudaFree(acts_gpu),
-                   "cudaFree");
-    throw_on_error(cudaFree(grads_gpu),
-                   "cudaFree");
-    throw_on_error(cudaFree(ctc_gpu_workspace),
-                   "cudaFree");
-    throw_on_error(cudaStreamDestroy(stream),
-                   "cudaStreamDestroy");
+    throw_on_error(hipFree(acts_gpu),
+                   "hipFree");
+    throw_on_error(hipFree(grads_gpu),
+                   "hipFree");
+    throw_on_error(hipFree(ctc_gpu_workspace),
+                   "hipFree");
+    throw_on_error(hipStreamDestroy(stream),
+                   "hipStreamDestroy");
 
     return diff;
 }
@@ -483,7 +484,7 @@ int main(void) {
     }
 
     std::cout << "Running GPU tests" << std::endl;
-    throw_on_error(cudaSetDevice(0), "cudaSetDevice");
+    throw_on_error(hipSetDevice(0), "hipSetDevice");
 
     bool status = true;
     status &= small_test();

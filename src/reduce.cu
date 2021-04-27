@@ -1,10 +1,11 @@
+#include "hip/hip_runtime.h"
 // Includes, system
 // #include <stdio.h>
 // #include <stdlib.h>
 
 // Includes, cuda
-// #include <cuda_runtime.h>
-// #include <cublas_v2.h>
+// #include <hip/hip_runtime.h>
+// #include <hipblas.h>
 
 // Includes, cuda helper functions
 // #include <helper_cuda.h>
@@ -13,7 +14,7 @@
 #include "detail/ctc_helper.h"
 #include "ctc.h"
 
-const int warp_size = 32;
+const int warp_size = 64;
 
 template<int NT, typename T, typename Rop>
 struct CTAReduce;
@@ -114,45 +115,41 @@ __global__ void reduce_cols(Iop f, Rop g, const T* input, T* output,
 struct ReduceHelper {
 
     template<typename T, typename Iof, typename Rof>
-    static void impl(Iof f, Rof g, const T* input, T* output, int num_rows, int num_cols, bool axis, cudaStream_t stream) {
+    static void impl(Iof f, Rof g, const T* input, T* output, int num_rows, int num_cols, bool axis, hipStream_t stream) {
 
         int grid_size;
 
         if (axis) {
             grid_size = num_cols;
-            reduce_rows<128><<<grid_size, 128, 0, stream>>>
-               (f, g, input, output, num_rows, num_cols);
-
+            hipLaunchKernelGGL(HIP_KERNEL_NAME(reduce_rows<128>), dim3(grid_size), dim3(128), 0, stream, f, g, input, output, num_rows, num_cols);
         } else {
             dim3 tpb(warp_size, 128 / warp_size);
             grid_size = (num_cols + warp_size - 1)/warp_size;
-            reduce_cols<128><<<grid_size, tpb, 0, stream>>>
-                (f, g, input, output, num_rows, num_cols);
-
+            hipLaunchKernelGGL(HIP_KERNEL_NAME(reduce_cols<128>), dim3(grid_size), dim3(tpb), 0, stream, f, g, input, output, num_rows, num_cols);
         }
     }
 };
 
 
 template<typename T, typename Iof, typename  Rof>
-ctcStatus_t reduce(Iof f, Rof g, const T* input, T* output, int rows, int cols, bool axis, cudaStream_t stream) {
+ctcStatus_t reduce(Iof f, Rof g, const T* input, T* output, int rows, int cols, bool axis, hipStream_t stream) {
     ReduceHelper::impl(f, g, input, output, rows, cols, axis, stream);
-    cudaStreamSynchronize(stream);
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess)
+    hipStreamSynchronize(stream);
+    hipError_t err = hipGetLastError();
+    if (err != hipSuccess)
         return CTC_STATUS_EXECUTION_FAILED;
 
     return CTC_STATUS_SUCCESS;
 }
 
-ctcStatus_t reduce_negate(const float *input, float *output, int rows, int cols, bool axis, cudaStream_t stream) {
+ctcStatus_t reduce_negate(const float *input, float *output, int rows, int cols, bool axis, hipStream_t stream) {
     return reduce(ctc_helper::negate<float>(), ctc_helper::add<float>(), input, output, rows, cols, axis, stream);
 }
 
-ctcStatus_t reduce_exp(const float *input, float *output, int rows, int cols, bool axis, cudaStream_t stream) {
+ctcStatus_t reduce_exp(const float *input, float *output, int rows, int cols, bool axis, hipStream_t stream) {
     return reduce(ctc_helper::exponential<float>(), ctc_helper::add<float>(), input, output, rows, cols, axis, stream);
 }
 
-ctcStatus_t reduce_max(const float *input, float *output, int rows, int cols, bool axis, cudaStream_t stream) {
+ctcStatus_t reduce_max(const float *input, float *output, int rows, int cols, bool axis, hipStream_t stream) {
     return reduce(ctc_helper::identity<float>(), ctc_helper::maximum<float>(),input, output, rows, cols, axis, stream);
 }

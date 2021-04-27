@@ -237,6 +237,9 @@ MGPU_HOST_DEVICE int2 min(int2 a, int2 b) {
 	return make_int2(min(a.x, b.x), min(a.y, b.y));
 }
 
+MGPU_DEVICE int min(int a, int b) {
+	return (b < a) ? b : a;
+}
 template<> struct numeric_limits<int2> {
 	MGPU_HOST_DEVICE static int2 min() { return make_int2(INT_MIN, INT_MIN); }
 	MGPU_HOST_DEVICE static int2 max() { return make_int2(INT_MAX, INT_MAX); }
